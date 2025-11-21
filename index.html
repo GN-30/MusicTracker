@@ -1,0 +1,414 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Sing-to-Draw — Responsive Mobile-ready</title>
+<style>
+  :root{
+    --bg:#fafafa;
+    --btn-pad:12px 14px;
+    --touch-size:48px;
+    --max-side:380px;
+  }
+  html,body{ height:100%; margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:var(--bg); color:#111; -webkit-font-smoothing:antialiased; }
+  .wrap{ display:flex; flex-direction:column; height:100vh; gap:10px; padding:10px; box-sizing:border-box; }
+  header{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button{ padding:var(--btn-pad); border-radius:10px; border:1px solid #cfcfcf; background:#fff; cursor:pointer; font-size:15px; }
+  button.small{ padding:8px 10px; font-size:14px; }
+  button:disabled{ opacity:0.55; cursor:default; }
+  .status{ font-size:14px; color:#222; margin-left:8px; }
+  /* main area: canvas + sidebar */
+  .main{ flex:1 1 auto; display:flex; gap:12px; align-items:stretch; }
+  .panel-canvas{ flex:1 1 0; min-width:280px; border-radius:12px; overflow:hidden; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,0.06); position:relative; display:flex; align-items:center; justify-content:center; }
+  /* visible canvas is scaled by DPR for crisp lines */
+  canvas#visibleCanvas{ width:100%; height:100%; display:block; }
+  img#bgImg{ position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; pointer-events:none; user-select:none; filter:contrast(.97) saturate(.98); }
+  /* sidebar */
+  aside.sidebar{ width:var(--max-side); max-width:40%; min-width:200px; display:flex; flex-direction:column; gap:10px; }
+  .card{ padding:10px; border-radius:10px; background:linear-gradient(180deg,#fff,#fbfbfb); border:1px solid #eee; box-shadow:0 6px 18px rgba(0,0,0,0.03); }
+  .small{ font-size:13px; color:#555; line-height:1.4; }
+  .debug{ font-family:monospace; font-size:13px; color:#333; margin-top:8px; }
+  .preview img{ max-width:100%; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); }
+  input[type=file]{ margin-top:8px; display:block; }
+  footer{ text-align:center; font-size:13px; color:#666; padding:6px 0; }
+
+  /* responsive: stack sidebar under canvas on narrow screens */
+  @media (max-width:900px){
+    .main{ flex-direction:column-reverse; }
+    aside.sidebar{ width:100%; max-width:none; min-width:0; }
+    .panel-canvas{ height:54vh; } /* leave room for controls */
+    button{ font-size:16px; padding:14px 16px; border-radius:12px; }
+    input[type=file]{ font-size:14px; }
+  }
+
+  /* mobile touch-friendly */
+  @media (pointer:coarse){
+    button{ min-height:var(--touch-size); min-width:64px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button id="startBtn">Start Mic</button>
+    <button id="stopBtn" disabled>Stop Mic</button>
+    <button id="setSaBtn" disabled>Set Sa</button>
+    <button id="clearBtn">Clear</button>
+    <div class="status" id="status">Pitch: — Hz | Swara: —</div>
+    <div style="margin-left:auto;" class="small">Sa: <strong id="saInfo">not set</strong></div>
+  </header>
+
+  <div class="main">
+    <div class="panel-canvas">
+      <img id="bgImg" src="https://i.imgur.com/8Km9tLL.png" alt="background" crossorigin="anonymous"/>
+      <canvas id="visibleCanvas" width="1000" height="700" aria-label="Drawing area"></canvas>
+      <!-- offscreen (not shown) used internally for drawing/export -->
+    </div>
+
+    <aside class="sidebar">
+      <div class="card">
+        <strong>How to use</strong>
+        <div class="small" style="margin-top:6px;">
+          1) (Recommended) Upload background image below.<br>
+          2) Start Mic → sing sustained tonic → Set Sa → sing phrases.<br>
+          3) Stop Mic to create final picture & Download.
+        </div>
+
+        <div style="margin-top:10px;">
+          <label class="small">Upload Background
+            <input id="bgUpload" type="file" accept="image/*" />
+          </label>
+        </div>
+
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="exportBtn" class="small">Export Image</button>
+          <button id="downloadBtn" class="small" disabled>Download</button>
+        </div>
+
+        <div class="debug" id="debug">RMS: — | Conf: — | SR: —</div>
+      </div>
+
+      <div class="card">
+        <strong>Preview</strong>
+        <div class="small" style="margin-top:6px;">Generated image appears here after Stop/Export.</div>
+        <div class="preview" id="previewArea" style="margin-top:8px;">No picture yet.</div>
+      </div>
+
+      <div class="card small">
+        Notes: Works on modern mobile browsers with HTTPS. If export fails due to CORS, upload a local background.
+      </div>
+    </aside>
+  </div>
+
+  <footer>Sing-to-Draw — responsive</footer>
+</div>
+
+<script>
+/* ----------------- Logic (responsive + DPR scaling) ----------------- */
+
+/* VIEW logical resolution used for exports and normalized coordinates */
+const VIEW_W = 1000, VIEW_H = 700;
+
+/* map semitone -> swara & normalized swaraPoints (0..1) */
+const semitoneToSwara = {0:'Sa',1:'Ri1',2:'Ri2',3:'Ga2',4:'Ga3',5:'Ma',6:'Ma#',7:'Pa',8:'Da1',9:'Da2',10:'Ni2',11:'Ni3'};
+const swaraPoints = {
+  'Sa':[ {x:0.5,y:0.10} ],
+  'Ri1':[ {x:0.64,y:0.20} ],
+  'Ri2':[ {x:0.80,y:0.36} ],
+  'Ga2':[ {x:0.76,y:0.54} ],
+  'Ga3':[ {x:0.60,y:0.72} ],
+  'Ma':[  {x:0.40,y:0.74} ],
+  'Ma#':[ {x:0.22,y:0.56} ],
+  'Pa':[  {x:0.16,y:0.32} ],
+  'Da1':[ {x:0.28,y:0.18} ],
+  'Da2':[ {x:0.48,y:0.34} ],
+  'Ni2':[ {x:0.36,y:0.44} ],
+  'Ni3':[ {x:0.44,y:0.44} ]
+};
+
+/* ---------- audio/pitch state ---------- */
+let audioCtx=null, analyser=null, source=null, mediaStream=null;
+let bufferLen = 2048, dataArray = null, isRunning=false;
+let SaFreq = null, lastEmittedTime = 0;
+const minEmitInterval = 500, stabilityFramesNeeded = 2;
+let recentSwaraHistory = [];
+
+/* DOM */
+const startBtn = document.getElementById('startBtn');
+const stopBtn  = document.getElementById('stopBtn');
+const setSaBtn = document.getElementById('setSaBtn');
+const clearBtn  = document.getElementById('clearBtn');
+const exportBtn = document.getElementById('exportBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const bgUpload   = document.getElementById('bgUpload');
+const statusEl = document.getElementById('status');
+const saInfo = document.getElementById('saInfo');
+const debugEl = document.getElementById('debug');
+const previewArea = document.getElementById('previewArea');
+const bgImg = document.getElementById('bgImg');
+
+/* visible canvas (scaled for DPR) */
+const visibleCanvas = document.getElementById('visibleCanvas');
+const vctx = visibleCanvas.getContext('2d');
+
+/* offscreen canvas for drawing (logical VIEW resolution) */
+const offscreen = document.createElement('canvas');
+offscreen.width = VIEW_W; offscreen.height = VIEW_H;
+const offctx = offscreen.getContext('2d');
+
+/* keep logical drawing state (offscreen) */
+let drawnPoints = [];
+
+/* device pixel scaling for visible canvas to remain crisp */
+function adjustVisibleCanvasForDPR(){
+  const rect = visibleCanvas.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  visibleCanvas.width = Math.round(rect.width * dpr);
+  visibleCanvas.height = Math.round(rect.height * dpr);
+  // scale context so drawing ops use CSS pixels
+  vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // optionally clear visible canvas
+  vctx.clearRect(0,0,rect.width,rect.height);
+  // We keep visible canvas blank while singing (per your request). If you wish to preview drawing live, we can render scaled offscreen into visible canvas.
+}
+
+/* call on load and on resize */
+window.addEventListener('resize', adjustVisibleCanvasForDPR);
+adjustVisibleCanvasForDPR();
+
+/* helper: draw a point into offscreen logical canvas only (hidden during singing) */
+function drawToOffscreen(x,y,swara){
+  // x,y are logical VIEW coords
+  offctx.beginPath();
+  offctx.arc(x,y,8,0,Math.PI*2);
+  offctx.fillStyle = 'rgba(255,120,40,0.95)';
+  offctx.fill();
+  if (drawnPoints.length > 0){
+    const p = drawnPoints[drawnPoints.length-1];
+    offctx.beginPath();
+    offctx.moveTo(p.x,p.y);
+    offctx.lineTo(x,y);
+    offctx.lineWidth = 5;
+    offctx.strokeStyle = 'rgba(60,120,220,0.9)';
+    offctx.stroke();
+  }
+  drawnPoints.push({x,y,swara});
+}
+
+/* choose next point for a swara (normalized -> logical) */
+function choosePointForSwara(swara){
+  const pts = swaraPoints[swara];
+  if (!pts || pts.length===0) return null;
+  const used = drawnPoints.filter(d => d.swara === swara).length;
+  const idx = used % pts.length;
+  const norm = pts[idx];
+  const x = norm.x * VIEW_W, y = norm.y * VIEW_H;
+  drawToOffscreen(x,y,swara);
+  return {x,y};
+}
+
+/* YIN detector (same compact implementation) */
+function YIN_detector(buf, sampleRate){
+  const threshold = 0.12;
+  const N = buf.length;
+  const maxLag = Math.floor(N/2);
+  const df = new Float32Array(maxLag+1);
+  for (let tau=1;tau<=maxLag;tau++){
+    let s=0;
+    for (let i=0;i<maxLag;i++){ const d = buf[i] - buf[i+tau]; s += d*d; }
+    df[tau] = s;
+  }
+  const dcn = new Float32Array(maxLag+1);
+  dcn[0] = 1;
+  let run = 0;
+  for (let tau=1;tau<=maxLag;tau++){ run += df[tau]; dcn[tau] = df[tau] * tau / (run || 1e-8); }
+  let tauEst = -1;
+  for (let tau=1;tau<=maxLag;tau++){
+    if (dcn[tau] < threshold){
+      while (tau+1 <= maxLag && dcn[tau+1] < dcn[tau]) tau++;
+      tauEst = tau; break;
+    }
+  }
+  if (tauEst === -1) return null;
+  const betterTau = parabolicInterpolation(dcn, tauEst);
+  const freq = sampleRate / betterTau;
+  const confidence = Math.max(0, 1 - dcn[tauEst]);
+  return {f: freq, prob: confidence, dcn: dcn[tauEst]};
+}
+function parabolicInterpolation(arr,tau){
+  const x0 = Math.max(0,tau-1), x2 = Math.min(arr.length-1,tau+1);
+  if (x0 === tau || x2 === tau) return tau;
+  const s0 = arr[x0], s1 = arr[tau], s2 = arr[x2];
+  const denom = (s0 + s2 - 2*s1);
+  if (Math.abs(denom) < 1e-10) return tau;
+  return tau + (s0 - s2) / (2*denom);
+}
+function freqToMidi(freq){ return 69 + 12 * Math.log2(freq / 440); }
+function semitoneFromSa(freq){ if (!SaFreq) return null; const midi = freqToMidi(freq), midiSa = freqToMidi(SaFreq); const rel = Math.round(midi - midiSa); const semitone = ((rel%12)+12)%12; return {rel,semitone}; }
+
+/* stability helper */
+function updateRecent(label){
+  recentSwaraHistory.push(label);
+  if (recentSwaraHistory.length > stabilityFramesNeeded) recentSwaraHistory.shift();
+  if (recentSwaraHistory.length < stabilityFramesNeeded) return false;
+  return recentSwaraHistory.every(v => v && v === recentSwaraHistory[0]);
+}
+
+/* ---------- Mic control ---------- */
+async function startMic(){
+  if (isRunning) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    source = audioCtx.createMediaStreamSource(mediaStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = bufferLen;
+    source.connect(analyser);
+    dataArray = new Float32Array(analyser.fftSize);
+    isRunning = true;
+    startBtn.disabled = true; stopBtn.disabled = false; setSaBtn.disabled = false;
+    debugEl.innerText = `RMS: — | Conf: — | SR: ${audioCtx.sampleRate}`;
+    // blank visible canvas while singing
+    vctx.clearRect(0,0,visibleCanvas.width,visibleCanvas.height);
+    adjustVisibleCanvasForDPR();
+    requestAnimationFrame(tick);
+  } catch (e){ console.error('startMic failed', e); alert('Microphone start failed: ' + (e && e.message?e.message:String(e))); }
+}
+startBtn.addEventListener('click', startMic);
+
+/* stop mic + auto export */
+async function stopMic(){
+  isRunning = false;
+  try { if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; } } catch(e){ console.warn(e); }
+  try { if (audioCtx) { await audioCtx.close(); audioCtx = null; } } catch(e){ console.warn(e); }
+  analyser = null; source = null; dataArray = null;
+  startBtn.disabled = false; stopBtn.disabled = true; setSaBtn.disabled = true;
+  statusEl.innerText = 'Pitch: — Hz | Swara: —'; debugEl.innerText = 'RMS: — | Conf: — | SR: —';
+  // auto export
+  try {
+    const url = await composeExportImage();
+    showPreviewAndEnableDownload(url);
+  } catch (err) {
+    console.error('Auto export failed', err);
+    previewArea.innerHTML = '<div class="small">Export failed — see console or upload a background image to avoid CORS issues.</div>';
+  }
+}
+stopBtn.addEventListener('click', stopMic);
+
+/* Set Sa (sample median) */
+setSaBtn.addEventListener('click', async ()=>{
+  if (!isRunning) { alert('Start the mic first'); return; }
+  const ok = confirm('Ready to capture Sa? Sing sustained Sa (~1.5s) then press OK.');
+  if (!ok) return;
+  setSaBtn.disabled = true; setSaBtn.textContent = 'Sampling...';
+  if (audioCtx && audioCtx.state === 'suspended') try { await audioCtx.resume(); } catch(e){ console.warn(e); }
+  try {
+    const freq = await captureSa();
+    if (freq) { SaFreq = freq; saInfo.textContent = SaFreq.toFixed(2)+' Hz'; recentSwaraHistory = []; alert('Sa set'); }
+    else alert('Failed to detect stable Sa — try again with clearer sustained note.');
+  } catch (e){ console.error(e); alert('Error capturing Sa: '+(e && e.message?e.message:String(e))); }
+  finally { setSaBtn.disabled = false; setSaBtn.textContent = 'Set Sa'; }
+});
+
+async function captureSa(){
+  if (!isRunning || !analyser) return null;
+  const samples = []; const totalMs = 1600, step = 120, rounds = Math.ceil(totalMs/step);
+  for (let i=0;i<rounds;i++){
+    await new Promise(r=>setTimeout(r, step));
+    if (!analyser) break;
+    analyser.getFloatTimeDomainData(dataArray);
+    const yin = YIN_detector(dataArray, audioCtx.sampleRate);
+    if (yin && yin.f && yin.prob > 0.2) samples.push(yin.f);
+  }
+  if (samples.length < Math.max(3, Math.floor(rounds/4))) return null;
+  samples.sort((a,b)=>a-b);
+  return samples[Math.floor(samples.length/2)];
+}
+
+/* background upload to avoid CORS */
+bgUpload.addEventListener('change', ev=>{
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  bgImg.removeAttribute('crossorigin');
+  bgImg.src = url;
+  bgImg.onload = ()=>{ /* ok */ };
+  bgImg.onerror = ()=>{ alert('Failed to load chosen image'); };
+});
+
+/* manual export */
+exportBtn.addEventListener('click', async ()=>{
+  try {
+    const url = await composeExportImage();
+    showPreviewAndEnableDownload(url);
+    alert('Export ready — preview shown.');
+  } catch (err) {
+    console.error('Export failed', err);
+    previewArea.innerHTML = '<div class="small">Export failed — see console; try uploading background image.</div>';
+  }
+});
+
+/* compose background + offscreen drawing into PNG data URL */
+async function composeExportImage(){
+  const out = document.createElement('canvas'); out.width = VIEW_W; out.height = VIEW_H;
+  const octx = out.getContext('2d');
+  await ensureImageLoaded(bgImg);
+  const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+  if (iw === 0 || ih === 0) throw new Error('Background not loaded');
+  const scale = Math.max(VIEW_W/iw, VIEW_H/ih);
+  const sw = VIEW_W/scale, sh = VIEW_H/scale;
+  const sx = (iw - sw)/2, sy = (ih - sh)/2;
+  octx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, VIEW_W, VIEW_H);
+  octx.drawImage(offscreen, 0, 0, VIEW_W, VIEW_H);
+  try {
+    return out.toDataURL('image/png');
+  } catch (e) {
+    throw e;
+  }
+}
+function ensureImageLoaded(img){ return new Promise((res, rej)=>{ if (img.complete && img.naturalWidth) return res(); const onl=()=>{ cleanup(); res(); }, one=()=>{ cleanup(); rej(new Error('bg load error')); }; function cleanup(){ img.removeEventListener('load', onl); img.removeEventListener('error', one); } img.addEventListener('load', onl); img.addEventListener('error', one); }); }
+function showPreviewAndEnableDownload(dataUrl){
+  previewArea.innerHTML = ''; const img = document.createElement('img'); img.src = dataUrl; previewArea.appendChild(img);
+  downloadBtn.disabled = false;
+  downloadBtn.onclick = ()=>{ const a=document.createElement('a'); a.href = dataUrl; a.download = `sing-draw-${new Date().toISOString().replace(/[:.]/g,'-')}.png`; document.body.appendChild(a); a.click(); a.remove(); };
+}
+
+/* main tick: run YIN and draw to offscreen only */
+function tick(){
+  if (!isRunning) return;
+  if (!analyser){ requestAnimationFrame(tick); return; }
+  analyser.getFloatTimeDomainData(dataArray);
+  // RMS
+  let s=0; for (let i=0;i<dataArray.length;i++) s += dataArray[i]*dataArray[i];
+  const rms = Math.sqrt(s / dataArray.length);
+  const yin = YIN_detector(dataArray, audioCtx ? audioCtx.sampleRate : 44100);
+  let pitch = null, conf = 0;
+  if (yin){ pitch = yin.f; conf = yin.prob; }
+  debugEl.innerText = `RMS: ${rms.toFixed(3)} | Conf: ${conf.toFixed(3)} | SR: ${audioCtx ? audioCtx.sampleRate : '—'}`;
+  if (pitch && SaFreq){
+    const sem = semitoneFromSa(pitch);
+    const swara = sem ? (semitoneToSwara[sem.semitone] || null) : null;
+    const stable = updateRecent(swara);
+    const now = Date.now();
+    if (stable && swara && (now - lastEmittedTime > minEmitInterval)){
+      choosePointForSwara(swara); // draws only to offscreen
+      lastEmittedTime = now;
+      recentSwaraHistory = [];
+    }
+    statusEl.innerText = `Pitch: ${pitch.toFixed(1)} Hz | Swara: ${swara || '—'}`;
+  } else {
+    statusEl.innerText = pitch ? `Pitch: ${pitch.toFixed(1)} Hz | Swara: set Sa` : 'Pitch: — Hz | Swara: —';
+    recentSwaraHistory.push(null); if (recentSwaraHistory.length > stabilityFramesNeeded) recentSwaraHistory.shift();
+  }
+  requestAnimationFrame(tick);
+}
+
+/* cleanup */
+window.addEventListener('beforeunload', ()=>{
+  if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+  if (audioCtx && typeof audioCtx.close === 'function') audioCtx.close();
+});
+</script>
+</body>
+</html>
