@@ -82,7 +82,7 @@
     font-size:15px; 
     font-weight:600;
     box-shadow:0 2px 4px rgba(0,0,0,0.05);
-    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+    transition: background 0.2s, transform 0.1s, opacity 0.2s, box-shadow 0.2s; /* Added box-shadow to transition */
   }
   
   /* Primary Action Button (Start Mic) */
@@ -91,14 +91,24 @@
     color: white;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
   }
-  #startBtn:hover:not(:disabled){ background: var(--accent-dark); transform: translateY(-1px); }
+  /* ENHANCED PRIMARY HOVER EFFECT */
+  #startBtn:hover:not(:disabled){ 
+    background: var(--accent-dark); 
+    transform: translateY(-2px); /* Slightly more lift */
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5); /* Enhanced shadow */
+  }
   
   /* Secondary Buttons */
   button:not(#startBtn){
     background: #edf2f7;
     color: #4a5568;
   }
-  button:not(#startBtn):hover:not(:disabled){ background: #e2e8f0; transform: translateY(-1px); }
+  /* ENHANCED SECONDARY HOVER EFFECT */
+  button:not(#startBtn):hover:not(:disabled){ 
+    background: #e2e8f0; 
+    transform: translateY(-2px); /* Slightly more lift */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Subtle shadow lift */
+  }
 
   /* Small Buttons */
   button.small{ 
