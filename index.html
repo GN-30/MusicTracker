@@ -3,39 +3,136 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Sing-to-Draw — Responsive (Clear fixed)</title>
+<title>Sing-to-Draw — Aesthetic</title>
 <style>
+  /* --- Global Reset & Variables --- */
   :root{
-    --bg:#fafafa;
-    --btn-pad:12px 14px;
-    --touch-size:48px;
-    --max-side:380px;
+    --bg: #f0f4f8; /* Soft light blue/gray background */
+    --accent: #667eea; /* Vibrant blue/purple primary accent */
+    --accent-dark: #5a67d8;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0; /* Light border color */
+    --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --shadow-medium: 0 10px 30px rgba(0, 0, 0, 0.08);
+    --btn-pad: 14px 20px;
+    --touch-size: 52px; /* Increased touch target size for better UX */
+    --max-side: 400px;
+    --radius-lg: 16px;
+    --radius-md: 10px;
   }
-  html,body{ height:100%; margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:var(--bg); color:#111; -webkit-font-smoothing:antialiased; }
-  .wrap{ display:flex; flex-direction:column; height:100vh; gap:10px; padding:10px; box-sizing:border-box; }
-  header{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  button{ padding:var(--btn-pad); border-radius:10px; border:1px solid #cfcfcf; background:#fff; cursor:pointer; font-size:15px; }
-  button.small{ padding:8px 10px; font-size:14px; }
-  button:disabled{ opacity:0.55; cursor:default; }
-  .status{ font-size:14px; color:#222; margin-left:8px; }
-  .main{ flex:1 1 auto; display:flex; gap:12px; align-items:stretch; }
-  .panel-canvas{ flex:1 1 0; min-width:280px; border-radius:12px; overflow:hidden; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,0.06); position:relative; display:flex; align-items:center; justify-content:center; }
+  html,body{ height:100%; margin:0; font-family:system-ui, 'Inter', 'Segoe UI', Roboto, Arial, sans-serif; background:var(--bg); color:#1a202c; -webkit-font-smoothing:antialiased; }
+  
+  /* --- Layout & Structure --- */
+  .wrap{ display:flex; flex-direction:column; height:100vh; gap:15px; padding:20px; box-sizing:border-box; }
+  header{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding-bottom:10px; }
+  .status{ font-size:16px; font-weight:500; color:var(--accent-dark); margin-left:15px; }
+  .main{ flex:1 1 auto; display:flex; gap:20px; align-items:stretch; }
+  aside.sidebar{ width:var(--max-side); max-width:40%; min-width:250px; display:flex; flex-direction:column; gap:15px; }
+  footer{ text-align:center; font-size:12px; color:#718096; padding:10px 0; border-top:1px solid var(--border-color); margin-top:10px; }
+
+  /* --- Canvas Panel (Focus Element) --- */
+  .panel-canvas{ 
+    flex:1 1 0; min-width:300px; 
+    border-radius:var(--radius-lg); 
+    overflow:hidden; 
+    background:var(--card-bg); 
+    box-shadow: var(--shadow-medium); /* More pronounced shadow for focus */
+    position:relative; 
+    display:flex; align-items:center; justify-content:center; 
+    border: 1px solid var(--border-color);
+    transition: box-shadow 0.3s ease;
+  }
+  .panel-canvas:hover {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+  }
   canvas#visibleCanvas{ width:100%; height:100%; display:block; background:transparent; }
-  img#bgImg{ position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; pointer-events:none; user-select:none; filter:contrast(.97) saturate(.98); }
-  aside.sidebar{ width:var(--max-side); max-width:40%; min-width:200px; display:flex; flex-direction:column; gap:10px; }
-  .card{ padding:10px; border-radius:10px; background:linear-gradient(180deg,#fff,#fbfbfb); border:1px solid #eee; box-shadow:0 6px 18px rgba(0,0,0,0.03); }
-  .small{ font-size:13px; color:#555; line-height:1.4; }
-  .debug{ font-family:monospace; font-size:13px; color:#333; margin-top:8px; }
-  .preview img{ max-width:100%; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); }
-  input[type=file]{ margin-top:8px; display:block; }
-  footer{ text-align:center; font-size:13px; color:#666; padding:6px 0; }
-  @media (max-width:900px){
-    .main{ flex-direction:column-reverse; }
-    aside.sidebar{ width:100%; max-width:none; min-width:0; }
-    .panel-canvas{ height:54vh; }
-    button{ font-size:16px; padding:14px 16px; border-radius:12px; }
+  img#bgImg{ object-fit:contain; filter:brightness(0.98); /* Slightly dim background for better drawing contrast */ }
+
+  /* --- Cards (Sidebar) --- */
+  .card{ 
+    padding:20px; 
+    border-radius:var(--radius-lg); 
+    background:var(--card-bg); 
+    border:1px solid var(--border-color); 
+    box-shadow:var(--shadow-light); 
+    transition: transform 0.2s;
   }
-  @media (pointer:coarse){
+  .card:hover {
+    transform: translateY(-2px);
+  }
+  .small{ font-size:14px; color:#4a5568; line-height:1.6; }
+  .debug{ font-family:monospace; font-size:13px; color:#4a5568; margin-top:10px; padding:8px; background:#f7fafc; border-radius:var(--radius-md); }
+  .preview img{ 
+    max-width:100%; 
+    border-radius:var(--radius-md); 
+    box-shadow:0 8px 20px rgba(0,0,0,0.1); 
+    margin-top:10px;
+    border: 1px solid var(--border-color);
+  }
+  input[type=file]{ margin-top:10px; display:block; padding:5px 0; }
+  
+  /* --- Buttons --- */
+  button{ 
+    padding:var(--btn-pad); 
+    border-radius:var(--radius-md); 
+    border:none; 
+    background:var(--card-bg); 
+    color:#1a202c; 
+    cursor:pointer; 
+    font-size:15px; 
+    font-weight:600;
+    box-shadow:0 2px 4px rgba(0,0,0,0.05);
+    transition: background 0.2s, transform 0.1s, opacity 0.2s;
+  }
+  
+  /* Primary Action Button (Start Mic) */
+  #startBtn{
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+  #startBtn:hover:not(:disabled){ background: var(--accent-dark); transform: translateY(-1px); }
+  
+  /* Secondary Buttons */
+  button:not(#startBtn){
+    background: #edf2f7;
+    color: #4a5568;
+  }
+  button:not(#startBtn):hover:not(:disabled){ background: #e2e8f0; transform: translateY(-1px); }
+
+  /* Small Buttons */
+  button.small{ 
+    padding:10px 14px; 
+    font-size:14px; 
+    min-width: unset;
+    min-height: unset;
+  }
+
+  /* Disabled State */
+  button:disabled{ 
+    opacity:0.65; 
+    cursor:default; 
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  button:active:not(:disabled){ transform: translateY(0); }
+
+  /* Info/Sa Display */
+  div.small strong#saInfo {
+    color: var(--accent);
+    font-size: 16px;
+  }
+
+  /* --- Responsive Adjustments --- */
+  @media (max-width:1024px){ /* Adjusted breakpoint for larger tablets/smaller desktops */
+    .wrap{ padding:15px; }
+    .main{ flex-direction:column-reverse; gap:15px; }
+    aside.sidebar{ width:100%; max-width:none; min-width:0; }
+    .panel-canvas{ height:50vh; }
+    button{ font-size:16px; padding:12px 18px; border-radius:var(--radius-lg); }
+  }
+  
+  @media (pointer:coarse){ /* Touch Devices */
     button{ min-height:var(--touch-size); min-width:64px; }
   }
 </style>
@@ -62,8 +159,8 @@
         <strong>How to use</strong>
         <div class="small" style="margin-top:6px;">
           1) (Recommended) Upload background image below.<br>
-          2) Start Mic → sing sustained tonic → Set Sa → sing phrases.<br>
-          3) Stop Mic to create final picture & Download.
+          2) **Start Mic** → sing sustained tonic → **Set Sa** → sing phrases.<br>
+          3) **Stop Mic** to create final picture & Download.
         </div>
 
         <div style="margin-top:10px;">
@@ -92,7 +189,7 @@
     </aside>
   </div>
 
-  <footer>Sing-to-Draw — responsive (Clear fixed)</footer>
+  <footer>Sing-to-Draw — Aesthetic & Responsive</footer>
 </div>
 
 <script>
@@ -112,12 +209,12 @@ const minEmitInterval = 500, stabilityFramesNeeded = 2;
 let recentSwaraHistory = [];
 
 const startBtn = document.getElementById('startBtn');
-const stopBtn  = document.getElementById('stopBtn');
+const stopBtn  = document.getElementById('stopBtn');
 const setSaBtn = document.getElementById('setSaBtn');
-const clearBtn  = document.getElementById('clearBtn');
+const clearBtn  = document.getElementById('clearBtn');
 const exportBtn = document.getElementById('exportBtn');
 const downloadBtn = document.getElementById('downloadBtn');
-const bgUpload   = document.getElementById('bgUpload');
+const bgUpload   = document.getElementById('bgUpload');
 const statusEl = document.getElementById('status');
 const saInfo = document.getElementById('saInfo');
 const debugEl = document.getElementById('debug');
@@ -164,6 +261,7 @@ clearBtn.addEventListener('click', () => {
 
 /* draw to offscreen (hidden) canvas only */
 function drawToOffscreen(x,y,swara){
+  // Use aesthetic colors for drawing (e.g., orange/blue combination)
   offctx.beginPath(); offctx.arc(x,y,8,0,Math.PI*2); offctx.fillStyle='rgba(255,120,40,0.95)'; offctx.fill();
   if (drawnPoints.length>0){
     const p = drawnPoints[drawnPoints.length-1];
@@ -358,7 +456,7 @@ window.addEventListener('beforeunload', ()=>{ if (mediaStream) mediaStream.getTr
 startBtn.addEventListener('click', ()=>{ stopBtn.disabled = false; });
 stopBtn.addEventListener('click', ()=>{ /* handled above */ });
 
-console.log('Responsive Sing-to-Draw (Clear fixed) loaded.');
+console.log('Aesthetic Sing-to-Draw loaded.');
 </script>
 </body>
 </html>
