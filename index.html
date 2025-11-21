@@ -3,433 +3,52 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Sing-to-Draw — Modern Edition</title>
+<title>Sing-to-Draw — Responsive (Clear fixed)</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  
   :root{
-    --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --card-bg: rgba(255, 255, 255, 0.95);
-    --glass-bg: rgba(255, 255, 255, 0.1);
-    --glass-border: rgba(255, 255, 255, 0.2);
-    --text-primary: #1a202c;
-    --text-secondary: #4a5568;
-    --text-light: #718096;
-    --accent: #667eea;
-    --accent-hover: #5568d3;
-    --success: #48bb78;
-    --danger: #f56565;
-    --shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --bg:#fafafa;
+    --btn-pad:12px 14px;
+    --touch-size:48px;
+    --max-side:380px;
   }
-  
-  * { box-sizing: border-box; }
-  
-  html, body { 
-    height: 100%; 
-    margin: 0; 
-    font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-    background: var(--bg);
-    color: var(--text-primary);
-    overflow-x: hidden;
+  html,body{ height:100%; margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; background:var(--bg); color:#111; -webkit-font-smoothing:antialiased; }
+  .wrap{ display:flex; flex-direction:column; height:100vh; gap:10px; padding:10px; box-sizing:border-box; }
+  header{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button{ padding:var(--btn-pad); border-radius:10px; border:1px solid #cfcfcf; background:#fff; cursor:pointer; font-size:15px; }
+  button.small{ padding:8px 10px; font-size:14px; }
+  button:disabled{ opacity:0.55; cursor:default; }
+  .status{ font-size:14px; color:#222; margin-left:8px; }
+  .main{ flex:1 1 auto; display:flex; gap:12px; align-items:stretch; }
+  .panel-canvas{ flex:1 1 0; min-width:280px; border-radius:12px; overflow:hidden; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,0.06); position:relative; display:flex; align-items:center; justify-content:center; }
+  canvas#visibleCanvas{ width:100%; height:100%; display:block; background:transparent; }
+  img#bgImg{ position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; pointer-events:none; user-select:none; filter:contrast(.97) saturate(.98); }
+  aside.sidebar{ width:var(--max-side); max-width:40%; min-width:200px; display:flex; flex-direction:column; gap:10px; }
+  .card{ padding:10px; border-radius:10px; background:linear-gradient(180deg,#fff,#fbfbfb); border:1px solid #eee; box-shadow:0 6px 18px rgba(0,0,0,0.03); }
+  .small{ font-size:13px; color:#555; line-height:1.4; }
+  .debug{ font-family:monospace; font-size:13px; color:#333; margin-top:8px; }
+  .preview img{ max-width:100%; border-radius:8px; box-shadow:0 8px 20px rgba(0,0,0,0.12); }
+  input[type=file]{ margin-top:8px; display:block; }
+  footer{ text-align:center; font-size:13px; color:#666; padding:6px 0; }
+  @media (max-width:900px){
+    .main{ flex-direction:column-reverse; }
+    aside.sidebar{ width:100%; max-width:none; min-width:0; }
+    .panel-canvas{ height:54vh; }
+    button{ font-size:16px; padding:14px 16px; border-radius:12px; }
   }
-  
-  body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-      radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(252, 70, 107, 0.3), transparent 50%);
-    pointer-events: none;
-    z-index: 0;
-  }
-  
-  .wrap { 
-    display: flex; 
-    flex-direction: column; 
-    min-height: 100vh; 
-    gap: 20px; 
-    padding: 24px; 
-    position: relative;
-    z-index: 1;
-  }
-  
-  header { 
-    display: flex; 
-    gap: 12px; 
-    align-items: center; 
-    flex-wrap: wrap;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 20px 24px;
-    border-radius: 20px;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow);
-    animation: slideDown 0.6s ease-out;
-  }
-  
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  .logo {
-    font-size: 24px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-right: 12px;
-  }
-  
-  button { 
-    padding: 12px 24px;
-    border-radius: 12px;
-    border: none;
-    background: rgba(255, 255, 255, 0.95);
-    color: var(--text-primary);
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: 'Inter', sans-serif;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: -1;
-  }
-  
-  button:hover::before {
-    opacity: 0.1;
-  }
-  
-  button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  }
-  
-  button:active {
-    transform: translateY(0);
-  }
-  
-  button.primary {
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-    color: white;
-  }
-  
-  button.primary::before {
-    background: white;
-  }
-  
-  button.danger {
-    background: linear-gradient(135deg, var(--danger) 0%, #e53e3e 100%);
-    color: white;
-  }
-  
-  button:disabled { 
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
-  
-  button:disabled:hover {
-    transform: none;
-    box-shadow: var(--shadow-sm);
-  }
-  
-  .status { 
-    font-size: 14px;
-    color: white;
-    margin-left: auto;
-    padding: 10px 18px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    font-weight: 500;
-  }
-  
-  .sa-info {
-    font-size: 13px;
-    color: white;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-  
-  .sa-info strong {
-    color: #fff;
-    font-weight: 600;
-  }
-  
-  .main { 
-    flex: 1; 
-    display: flex; 
-    gap: 20px; 
-    align-items: stretch;
-    animation: fadeIn 0.8s ease-out 0.2s both;
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  .panel-canvas { 
-    flex: 1; 
-    min-width: 300px;
-    border-radius: 24px;
-    overflow: hidden;
-    background: white;
-    box-shadow: var(--shadow);
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.3s ease;
-  }
-  
-  .panel-canvas:hover {
-    transform: scale(1.01);
-  }
-  
-  canvas#visibleCanvas { 
-    width: 100%; 
-    height: 100%; 
-    display: block;
-  }
-  
-  img#bgImg { 
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    pointer-events: none;
-    user-select: none;
-  }
-  
-  aside.sidebar { 
-    width: 380px;
-    max-width: 40%;
-    min-width: 280px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  
-  .card { 
-    padding: 24px;
-    border-radius: 20px;
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: var(--shadow);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-  }
-  
-  .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
-  }
-  
-  .card-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 12px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .card-title::before {
-    content: '';
-    width: 4px;
-    height: 20px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-    border-radius: 2px;
-  }
-  
-  .small { 
-    font-size: 14px;
-    color: var(--text-secondary);
-    line-height: 1.6;
-  }
-  
-  .debug { 
-    font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-    font-size: 12px;
-    color: var(--text-light);
-    margin-top: 12px;
-    padding: 12px;
-    background: rgba(102, 126, 234, 0.05);
-    border-radius: 8px;
-    border: 1px solid rgba(102, 126, 234, 0.1);
-  }
-  
-  .preview-container {
-    margin-top: 12px;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #f7fafc;
-    min-height: 100px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .preview-container img { 
-    max-width: 100%;
-    display: block;
-    animation: scaleIn 0.5s ease-out;
-  }
-  
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.9); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  
-  .file-upload-wrapper {
-    margin-top: 12px;
-    position: relative;
-  }
-  
-  .file-upload-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px 20px;
-    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-    border: 2px dashed var(--accent);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--accent);
-  }
-  
-  .file-upload-label:hover {
-    background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
-    border-color: var(--accent-hover);
-    transform: translateY(-2px);
-  }
-  
-  input[type=file] { 
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-  
-  .button-group {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 12px;
-  }
-  
-  .button-group button {
-    flex: 1;
-    min-width: 120px;
-    padding: 10px 16px;
-    font-size: 13px;
-  }
-  
-  footer { 
-    text-align: center;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
-    padding: 20px 0;
-    font-weight: 500;
-  }
-  
-  .pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-  }
-  
-  @media (max-width: 900px) {
-    .wrap { padding: 16px; gap: 16px; }
-    
-    header {
-      padding: 16px;
-      border-radius: 16px;
-    }
-    
-    .logo { font-size: 20px; margin-right: 8px; }
-    
-    .main { 
-      flex-direction: column-reverse;
-    }
-    
-    aside.sidebar { 
-      width: 100%;
-      max-width: none;
-      min-width: 0;
-    }
-    
-    .panel-canvas { 
-      height: 50vh;
-      min-height: 300px;
-    }
-    
-    button { 
-      font-size: 15px;
-      padding: 14px 20px;
-    }
-    
-    .status {
-      width: 100%;
-      margin-left: 0;
-      text-align: center;
-    }
-  }
-  
-  @media (pointer: coarse) {
-    button { 
-      min-height: 48px;
-      min-width: 64px;
-    }
+  @media (pointer:coarse){
+    button{ min-height:var(--touch-size); min-width:64px; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">🎵 Sing-to-Draw</div>
-    <button id="startBtn" class="primary">Start Mic</button>
-    <button id="stopBtn" class="danger" disabled>Stop Mic</button>
+    <button id="startBtn">Start Mic</button>
+    <button id="stopBtn" disabled>Stop Mic</button>
     <button id="setSaBtn" disabled>Set Sa</button>
-    <button id="clearBtn">Clear Canvas</button>
+    <button id="clearBtn">Clear</button>
     <div class="status" id="status">Pitch: — Hz | Swara: —</div>
-    <div class="sa-info">Sa: <strong id="saInfo">not set</strong></div>
+    <div style="margin-left:auto;" class="small">Sa: <strong id="saInfo">not set</strong></div>
   </header>
 
   <div class="main">
@@ -440,46 +59,40 @@
 
     <aside class="sidebar">
       <div class="card">
-        <h3 class="card-title">How to Use</h3>
-        <div class="small">
-          <strong>1.</strong> Upload a background image (recommended)<br>
-          <strong>2.</strong> Start Mic → sing sustained tonic → Set Sa<br>
-          <strong>3.</strong> Sing phrases to draw<br>
-          <strong>4.</strong> Stop Mic to create & download your art
+        <strong>How to use</strong>
+        <div class="small" style="margin-top:6px;">
+          1) (Recommended) Upload background image below.<br>
+          2) Start Mic → sing sustained tonic → Set Sa → sing phrases.<br>
+          3) Stop Mic to create final picture & Download.
         </div>
 
-        <div class="file-upload-wrapper">
-          <label class="file-upload-label">
-            📁 Choose Background Image
+        <div style="margin-top:10px;">
+          <label class="small">Upload Background
             <input id="bgUpload" type="file" accept="image/*" />
           </label>
         </div>
 
-        <div class="button-group">
-          <button id="exportBtn">Export Image</button>
-          <button id="downloadBtn" disabled>Download</button>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="exportBtn" class="small">Export Image</button>
+          <button id="downloadBtn" class="small" disabled>Download</button>
         </div>
 
         <div class="debug" id="debug">RMS: — | Conf: — | SR: —</div>
       </div>
 
       <div class="card">
-        <h3 class="card-title">Preview</h3>
-        <div class="small">Your masterpiece will appear here after stopping or exporting.</div>
-        <div class="preview-container" id="previewArea">
-          <div class="small" style="color: #a0aec0;">No artwork yet</div>
-        </div>
+        <strong>Preview</strong>
+        <div class="small" style="margin-top:6px;">Generated image appears here after Stop/Export.</div>
+        <div class="preview" id="previewArea" style="margin-top:8px;">No picture yet.</div>
       </div>
 
-      <div class="card">
-        <div class="small">
-          💡 <strong>Tip:</strong> Works best on modern browsers with HTTPS. Upload a local background to avoid CORS issues.
-        </div>
+      <div class="card small">
+        Notes: Works on modern mobile browsers with HTTPS. If export fails due to CORS, upload a local background.
       </div>
     </aside>
   </div>
 
-  <footer>✨ Sing-to-Draw — Create art with your voice</footer>
+  <footer>Sing-to-Draw — responsive (Clear fixed)</footer>
 </div>
 
 <script>
@@ -541,7 +154,7 @@ function clearDrawingState(){
   drawnPoints = [];
   offctx.clearRect(0,0,VIEW_W,VIEW_H);
   vctx.clearRect(0,0,visibleCanvas.width / (window.devicePixelRatio||1), visibleCanvas.height / (window.devicePixelRatio||1));
-  previewArea.innerHTML = '<div class="small" style="color: #a0aec0;">No artwork yet</div>';
+  previewArea.innerHTML = '<div class="small">No picture yet.</div>';
   downloadBtn.disabled = true;
 }
 clearBtn.addEventListener('click', () => {
@@ -634,7 +247,7 @@ async function stopMic(){
     showPreviewAndEnableDownload(url);
   } catch (err) {
     console.error('Auto export failed', err);
-    previewArea.innerHTML = '<div class="small" style="color: #f56565;">Auto-export failed — try uploading a local background image to avoid CORS.</div>';
+    previewArea.innerHTML = '<div class="small">Auto-export failed — try uploading a local background image to avoid CORS.</div>';
   }
 }
 stopBtn.addEventListener('click', stopMic);
@@ -697,4 +310,55 @@ function ensureImageLoaded(img){ return new Promise((res,rej)=>{ if (img.complet
 /* preview & download */
 function showPreviewAndEnableDownload(dataUrl){
   previewArea.innerHTML = ''; const img = document.createElement('img'); img.src = dataUrl; previewArea.appendChild(img);
-  downloadBtn.disabled = false; downloadBtn.onclick = ()=>{ const a=document.createElement('a'); a.href=dataUrl; a.download = `
+  downloadBtn.disabled = false; downloadBtn.onclick = ()=>{ const a=document.createElement('a'); a.href=dataUrl; a.download = `sing-draw-${new Date().toISOString().replace(/[:.]/g,'-')}.png`; document.body.appendChild(a); a.click(); a.remove(); };
+}
+
+/* manual export */
+exportBtn.addEventListener('click', async ()=>{
+  try {
+    const url = await composeExportImage(); showPreviewAndEnableDownload(url); alert('Export ready — preview shown.');
+  } catch (err) { console.error('Export failed', err); previewArea.innerHTML = '<div class="small">Export failed — try uploading a local background image.</div>'; }
+});
+
+/* main detection loop */
+function tick(){
+  if (!isRunning) return;
+  if (!analyser){ requestAnimationFrame(tick); return; }
+  analyser.getFloatTimeDomainData(dataArray);
+  let sum=0; for (let i=0;i<dataArray.length;i++) sum += dataArray[i]*dataArray[i];
+  const rms = Math.sqrt(sum / dataArray.length);
+  const yin = YIN_detector(dataArray, audioCtx ? audioCtx.sampleRate : 44100);
+  let pitch=null, conf=0;
+  if (yin){ pitch = yin.f; conf = yin.prob; }
+  debugEl.innerText = `RMS: ${rms.toFixed(3)} | Conf: ${conf.toFixed(3)} | SR: ${audioCtx ? audioCtx.sampleRate : '—'}`;
+  if (pitch && SaFreq){
+    const sem = semitoneFromSa(pitch);
+    const swara = sem ? (semitoneToSwara[sem.semitone] || null) : null;
+    const stable = updateRecent(swara);
+    const now = Date.now();
+    if (stable && swara && (now - lastEmittedTime > minEmitInterval)){
+      choosePointForSwara(swara); lastEmittedTime = now; recentSwaraHistory = [];
+    }
+    statusEl.innerText = `Pitch: ${pitch.toFixed(1)} Hz | Swara: ${swara || '—'}`;
+  } else {
+    statusEl.innerText = pitch ? `Pitch: ${pitch.toFixed(1)} Hz | Swara: set Sa` : 'Pitch: — Hz | Swara: —';
+    recentSwaraHistory.push(null); if (recentSwaraHistory.length > stabilityFramesNeeded) recentSwaraHistory.shift();
+  }
+  requestAnimationFrame(tick);
+}
+
+/* utilities */
+function updateRecent(label){ recentSwaraHistory.push(label); if (recentSwaraHistory.length > stabilityFramesNeeded) recentSwaraHistory.shift(); if (recentSwaraHistory.length < stabilityFramesNeeded) return false; return recentSwaraHistory.every(v => v && v === recentSwaraHistory[0]); }
+function isCanvasTaintedError(err){ if (!err) return false; const msg = err && err.message ? err.message.toLowerCase() : ''; return msg.includes('tainted') || msg.includes('cross-origin') || msg.includes('security') || msg.includes('domexception'); }
+
+/* cleanup */
+window.addEventListener('beforeunload', ()=>{ if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); if (audioCtx && typeof audioCtx.close === 'function') audioCtx.close(); });
+
+/* keep UI coherent */
+startBtn.addEventListener('click', ()=>{ stopBtn.disabled = false; });
+stopBtn.addEventListener('click', ()=>{ /* handled above */ });
+
+console.log('Responsive Sing-to-Draw (Clear fixed) loaded.');
+</script>
+</body>
+</html>
